@@ -85,3 +85,15 @@ apps-script/Code.gs скрипт для Google Таблиці
 ```
 
 Новий рівень — це новий об'єкт у `LEVELS` у `js/levels.js`: карта 9×13, предмети-підказки, двері з питаннями і функція `params(rng)`, яка генерує числа.
+
+## Трейлер
+
+`trailer/orden-delta-trailer.mp4`: вертикальне відео 1080×1920, 43 с, H.264 + AAC, для Telegram. Обкладинка: `trailer/orden-delta-cover.jpg`.
+
+Кадри малює сам рушій гри, а музика синтезується офлайн. Щоб перерендерити (потрібні Node, Playwright з Chromium і ffmpeg):
+
+```
+node trailer/render.mjs trailer/orden-delta-trailer.mp4
+```
+
+Переглянути в браузері без рендеру можна на сторінці `trailer/index.html` (кнопка «Переглянути»).
