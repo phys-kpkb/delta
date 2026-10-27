@@ -1,6 +1,6 @@
 // Рендер трейлера у MP4 (1080×1920, 30 fps, H.264 + AAC).
 // Потрібні: node, playwright (з Chromium) і ffmpeg у PATH.
-//   node trailer/render.mjs [вихід.mp4] [--shots папка]
+//   node trailer/render.mjs [вихід.mp4] [--shots папка] [--page level2.html]
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
@@ -16,6 +16,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const out = path.resolve(args.find((a) => a.endsWith('.mp4')) || 'trailer.mp4');
 const shotsDir = args.includes('--shots') ? path.resolve(args[args.indexOf('--shots') + 1]) : null;
+const pageName = args.includes('--page') ? args[args.indexOf('--page') + 1] : 'index.html';
 if (shotsDir) fs.mkdirSync(shotsDir, { recursive: true });
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json' };
@@ -30,7 +31,7 @@ const port = server.address().port;
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 540, height: 960 } });
 page.on('pageerror', (e) => console.error('page error:', e));
-await page.goto(`http://localhost:${port}/trailer/index.html`);
+await page.goto(`http://localhost:${port}/trailer/${pageName}`);
 await page.waitForFunction(() => window.trailer);
 await page.evaluate(async () => {
   await Promise.all([
