@@ -4,7 +4,8 @@ import { T, C, SPR, sprite, heroSprite, makeCanvas, drawFloor, drawCarpet, drawR
 import { sfx } from './audio.js';
 
 const COLS = 9, ROWS = 13;
-const FPS = { torch: 8, door_rune: 3, door_sage: 1.5, seal: 3, candles: 5, furnace: 8, brazier: 8, cat: 0.8, horse: 0.6 };
+const FPS = { torch: 8, door_rune: 3, door_sage: 1.5, seal: 3, candles: 5, furnace: 8, brazier: 8, cat: 0.8, horse: 0.6, door_mythic: 5, apple_tree: 0.7 };
+const SOLID = (k) => k === '#' || k === ' ';
 
 const LIGHTS = {
   torch: { c: '255,166,77', r: 3.4, a: 0.30, dy: 0.4 },
@@ -59,7 +60,7 @@ export class Game {
 
   isWall(x, y) {
     if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return true;
-    return this.map[y][x] === '#';
+    return SOLID(this.map[y][x]);
   }
 
   buildStatic() {
@@ -70,22 +71,23 @@ export class Game {
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         const k = ch(x, y), ox = x * T, oy = y * T;
+        if (k === ' ') continue; // порожнеча за межами залу
         if (k === '#') {
-          if (ch(x, y + 1) !== '#') drawBricks(r, ox, oy, x);
-          else drawCap(r, ox, oy, { l: ch(x - 1, y) !== '#', r: ch(x + 1, y) !== '#', t: y > 0 && ch(x, y - 1) !== '#' });
+          if (!SOLID(ch(x, y + 1))) drawBricks(r, ox, oy, x);
+          else drawCap(r, ox, oy, { l: !SOLID(ch(x - 1, y)), r: !SOLID(ch(x + 1, y)), t: y > 0 && !SOLID(ch(x, y - 1)) });
         } else {
           drawFloor(r, this.room.floor, ox, oy, x, y);
           if (k === '=') drawCarpet(r, ox, oy, { l: ch(x - 1, y) === '=', r: ch(x + 1, y) === '=', t: ch(x, y - 1) === '=', b: ch(x, y + 1) === '=' });
           if (k === '_') drawRails(r, ox, oy);
           // тіні від стін
-          if (ch(x, y - 1) === '#') { r('rgba(0,0,0,.45)', ox, oy, 16, 2); r('rgba(0,0,0,.25)', ox, oy + 2, 16, 2); }
-          if (ch(x - 1, y) === '#') r('rgba(0,0,0,.3)', ox, oy, 2, 16);
-          if (ch(x + 1, y) === '#') r('rgba(0,0,0,.2)', ox + 14, oy, 2, 16);
+          if (SOLID(ch(x, y - 1))) { r('rgba(0,0,0,.45)', ox, oy, 16, 2); r('rgba(0,0,0,.25)', ox, oy + 2, 16, 2); }
+          if (SOLID(ch(x - 1, y))) r('rgba(0,0,0,.3)', ox, oy, 2, 16);
+          if (SOLID(ch(x + 1, y))) r('rgba(0,0,0,.2)', ox + 14, oy, 2, 16);
         }
       }
     }
     // вхідна арка внизу
-    const ex = 4 * T, ey = (ROWS - 1) * T;
+    const ex = (this.room.entry ? this.room.entry[0] : 4) * T, ey = ((this.room.entry ? this.room.entry[1] : ROWS - 2) + 1) * T;
     r('#000', ex + 3, ey, 10, 6); r(C.goldLo, ex + 2, ey, 1, 6); r(C.goldLo, ex + 13, ey, 1, 6);
     this.staticLayer = c;
   }
@@ -145,6 +147,7 @@ export class Game {
 
   spriteName(o) {
     if (o.kind === 'door') return o.sprite + (o.open ? '_open' : '');
+    if (o.kind === 'mythic') return o.state === 'won' ? 'door_mythic_open' : o.state === 'lost' ? 'door_mythic_broken' : 'door_mythic';
     if (o.kind === 'fresco') return o.restored ? 'fresco_on' : 'fresco';
     if (o.kind === 'crack') return o.broken ? 'crack_open' : 'crack';
     if (o.kind === 'cat') return 'cat';
@@ -288,7 +291,7 @@ export class Game {
       const o = it.o;
       const name = this.spriteName(o);
       const def = SPR[name];
-      const fps = FPS[name.replace('_open', '')] || 0;
+      const fps = FPS[name] || FPS[name.replace('_open', '')] || 0;
       const f = def.frames ? Math.floor(t * fps + (o.x * 7 + o.y * 3)) % def.frames : 0;
       const b = this.spriteBox(o);
       g.drawImage(sprite(name, f), Math.round(b.x), Math.round(b.y));
@@ -336,6 +339,15 @@ export class Game {
       const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
       gr.addColorStop(0, `rgba(246,222,143,${0.28 + 0.06 * Math.sin(t * 3)})`);
       gr.addColorStop(1, 'rgba(246,222,143,0)');
+      ctx.fillStyle = gr; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+    }
+    // міфічні двері пульсують фіолетовим
+    for (const o of this.objs) {
+      if (o.kind !== 'mythic' || o.state === 'lost') continue;
+      const cx = (o.x + 0.5) * T * k, cy = (o.y + 0.9) * T * k, R = (2.4 + 0.3 * Math.sin(t * 2.5)) * T * k;
+      const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+      gr.addColorStop(0, `rgba(162,89,255,${0.34 + 0.1 * Math.sin(t * 2.5)})`);
+      gr.addColorStop(1, 'rgba(162,89,255,0)');
       ctx.fillStyle = gr; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
     }
     // ореол героя

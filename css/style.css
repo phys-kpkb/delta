@@ -351,3 +351,44 @@ b{color:var(--gold-hi);font-weight:700}
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.01ms !important;transition-duration:.01ms !important}
 }
+
+/* ---------- рідкісність бонусів, міфічні двері, бейджі ---------- */
+:root{ --rare:#f2c94c; --legendary:#ff8a1f; --mythic:#a259ff; --mythic-hi:#d6b0ff; }
+.tier-chip{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:99px;margin-bottom:4px;border:1px solid currentColor}
+.bonus.tier-rare{border-color:rgba(242,201,76,.55)}
+.bonus.tier-rare .tier-chip{color:var(--rare)}
+.bonus.tier-legendary{border-color:var(--legendary);background:linear-gradient(180deg,rgba(255,138,31,.16),#000);box-shadow:0 0 22px rgba(255,138,31,.25)}
+.bonus.tier-legendary .tier-chip,.bonus.tier-legendary .bonus-n{color:var(--legendary)}
+.bonus.tier-mythic{border-color:var(--mythic);background:linear-gradient(180deg,rgba(162,89,255,.22),#000);box-shadow:0 0 26px rgba(162,89,255,.35)}
+.bonus.tier-mythic .tier-chip,.bonus.tier-mythic .bonus-n{color:var(--mythic-hi)}
+.bonus[disabled]{pointer-events:none}
+
+.given{margin:2px 0 12px;padding:10px 12px;border-radius:12px;background:#000;border:1px solid var(--line-2)}
+.given-k{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
+.given-list{display:flex;flex-wrap:wrap;gap:6px}
+.given-it{font-family:"Cambria Math","Times New Roman",serif;font-style:italic;font-size:17px;color:var(--gold-hi);padding:3px 10px;border-radius:8px;background:rgba(216,176,74,.08);border:1px solid var(--line)}
+.given-it.found{color:var(--plus);border-color:rgba(127,207,138,.4);background:rgba(127,207,138,.08)}
+
+.mythic-sheet{background:linear-gradient(180deg,#1d0f33,#0b0712 160px);border-color:#4b2a7a}
+.mythic-k{color:var(--mythic-hi)}
+.mythic-ic{border-color:#4b2a7a;box-shadow:0 0 18px rgba(162,89,255,.35)}
+.mythic-warn{margin:4px 0 12px;padding:12px 14px;border-radius:12px;background:rgba(162,89,255,.12);border:1px solid var(--mythic);color:#efe4ff;font-size:15px}
+.mythic-warn b{color:var(--mythic-hi)}
+.mythic-sheet .rule{background:rgba(162,89,255,.07);border-color:#3a2560}
+.mythic-sheet .rule::before{background:var(--mythic)}
+.mythic-btn{background:linear-gradient(180deg,#d6b0ff,#a259ff 60%,#7c3fd0);color:#14051f;box-shadow:0 8px 24px rgba(162,89,255,.35),inset 0 1px 0 rgba(255,255,255,.5)}
+.mythic-win{text-align:center}
+.mythic-win .bonuses{text-align:left;margin-top:12px}
+.mythic-badge{width:96px;height:96px;image-rendering:pixelated;margin:0 auto 6px;display:block;filter:drop-shadow(0 0 24px rgba(162,89,255,.7));animation:pop .8s}
+
+.badges{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.badge{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:14px;border:1px dashed var(--line-2);background:#000;opacity:.45;filter:grayscale(1)}
+.badge.on{opacity:1;filter:none;border-style:solid;border-color:var(--gold-lo);background:linear-gradient(180deg,var(--panel-2),var(--panel))}
+.badge img{width:36px;height:36px;image-rendering:pixelated;flex:none}
+.badge-n{font-weight:800;font-size:14px;color:var(--gold-hi)}
+.badge-t{font-size:12px;color:var(--muted);line-height:1.3}
+.win-badges{display:grid;gap:8px;margin:10px 0;text-align:left}
+.row-badges{display:inline-flex;gap:3px;margin-left:6px;vertical-align:-3px}
+.badge-ic{width:18px;height:18px;image-rendering:pixelated}
+@media (max-width:380px){.badges{grid-template-columns:1fr}}
+.f sub,.formula sub,.given-it sub{font-style:normal;font-family:var(--f-ui);font-size:.7em}

@@ -172,6 +172,8 @@ export function sfx(name) {
     case 'bonus': [784, 988, 1175, 1568].forEach((f, i) => tone(f, t + i * 0.05, 0.5, 'sine', 0.1)); break;
     case 'key': tone(1319, t, 0.15, 'square', 0.04); tone(1760, t + 0.08, 0.3, 'triangle', 0.08); break;
     case 'smash': noise(t, 0.4, 400, 0.7, 0.5); noise(t + 0.1, 0.3, 160, 1, 0.4); tone(55, t, 0.4, 'sine', 0.35); break;
+    case 'mythic': [523, 659, 831, 1047, 1319].forEach((f, i) => { tone(f, t + i * 0.06, 1.2, 'sine', 0.09); tone(f * 1.5, t + i * 0.06 + 0.03, 0.9, 'triangle', 0.03); }); break;
+    case 'crumble': noise(t, 0.9, 300, 0.6, 0.45); noise(t + 0.15, 0.7, 900, 0.8, 0.25); tone(90, t, 0.8, 'sine', 0.3); tone(233, t + 0.05, 0.5, 'sawtooth', 0.05); break;
     case 'meow': {
       const o = ac.createOscillator(); o.type = 'sawtooth';
       o.frequency.setValueAtTime(520, t); o.frequency.linearRampToValueAtTime(820, t + 0.12); o.frequency.linearRampToValueAtTime(430, t + 0.45);

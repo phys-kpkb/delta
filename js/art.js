@@ -42,6 +42,18 @@ function painter(g) {
 // ---------- тайли підлоги та стін ----------
 
 export function drawFloor(r, kind, ox, oy, tx, ty) {
+  if (kind === 'ice') {
+    const dark = (tx + ty) & 1;
+    r(dark ? '#1b2a33' : '#22343f', ox, oy, 16, 16);
+    r('#132028', ox, oy + 15, 16, 1); r('#132028', ox + 15, oy, 1, 16);
+    r(dark ? '#2a3f4c' : '#30495a', ox, oy, 15, 1);
+    for (let i = 0; i < 3; i++) {
+      const px = 1 + Math.floor(hh(tx, ty, i) * 11), py = 1 + Math.floor(hh(ty, tx, i + 5) * 12);
+      r(i ? '#3c5a6c' : '#6f93a8', ox + px, oy + py, 3 - i, 1);
+    }
+    if (hh(tx, ty, 9) > 0.7) { const px = 2 + Math.floor(hh(tx, ty, 11) * 10); r('#9fc4d8', ox + px, oy + 4, 1, 1); r('#9fc4d8', ox + px + 1, oy + 5, 1, 1); }
+    return;
+  }
   if (kind === 'wood') {
     r('#33251a', ox, oy, 16, 16);
     for (let j = 0; j < 4; j++) {
@@ -527,6 +539,118 @@ export const SPR = {
     r('#c9c3b2', 9, 4, 3, 3); r(C.white, 9, 4, 1, 1);
     r(C.gold, 2, 12, 1, 1); r(C.gold, 5, 10, 1, 1); r(C.gold, 9, 8, 1, 1);
   } },
+  door_mythic: { w: 16, h: 16, frames: 4, draw(r, f) {
+    const g = ['#7c3fd0', '#a259ff', '#d6b0ff', '#a259ff'][f];
+    r(C.stoneDk, 2, 1, 12, 15); r('#6d4a9c', 3, 1, 10, 1);
+    r('#1e0f33', 3, 2, 10, 14); r('#341a57', 4, 3, 8, 13); r('#2a1447', 7, 3, 2, 13);
+    r(g, 3, 2, 10, 1); r(g, 3, 2, 1, 14); r(g, 12, 2, 1, 14);
+    deltaGlyph(r, 5, 6, g); r('#ffffff', 7, 9, 2, 1);
+    r(g, 5, 13, 1, 1); r(g, 10, 13, 1, 1); r(g, 7, 4, 2, 1);
+    if (f === 2) { r('#ffffff', 5, 4, 1, 1); r('#ffffff', 10, 11, 1, 1); }
+  } },
+  door_mythic_open: { w: 16, h: 16, draw(r) {
+    r(C.stoneDk, 2, 1, 12, 15); r('#6d4a9c', 3, 1, 10, 1);
+    r(C.ink, 3, 2, 10, 14); r('#24103d', 4, 3, 8, 13); r('#4b1f86', 5, 8, 6, 8); r('#7c3fd0', 6, 10, 4, 6); r('#d6b0ff', 7, 12, 2, 4);
+    r('#a259ff', 3, 2, 1, 14); r('#a259ff', 12, 2, 1, 14);
+  } },
+  door_mythic_broken: { w: 16, h: 16, draw(r) {
+    r(C.stoneDk, 2, 1, 12, 15); r(C.stone, 3, 1, 10, 1);
+    r(C.ink, 3, 2, 10, 14); r('#120c18', 4, 3, 8, 13);
+    r('#3a2a4a', 3, 12, 10, 4); r('#5a4670', 4, 11, 3, 2); r('#5a4670', 9, 12, 3, 2); r('#4a3a5c', 6, 10, 2, 2);
+    r('#7c3fd0', 6, 13, 1, 1); r('#7c3fd0', 11, 14, 1, 1);
+  } },
+  shield_stand: { w: 16, h: 16, draw(r) {
+    shadowRow(r, 3, 15, 10);
+    r(C.woodDk, 4, 13, 8, 2); r(C.woodLo, 7, 10, 2, 3);
+    r(C.goldLo, 4, 0, 8, 1); r(C.goldLo, 3, 1, 10, 1); r(C.goldLo, 2, 2, 12, 7); r(C.goldLo, 3, 9, 10, 1); r(C.goldLo, 4, 10, 8, 1);
+    r(C.red, 4, 1, 8, 1); r(C.red, 3, 2, 10, 7); r(C.red, 4, 9, 8, 1); r(C.redHi, 4, 2, 3, 2);
+    deltaGlyph(r, 5, 3, C.gold);
+  } },
+  scales: { w: 16, h: 16, draw(r) {
+    shadowRow(r, 3, 15, 10);
+    r(C.woodDk, 5, 13, 6, 2); r(C.goldLo, 7, 3, 2, 10); r(C.gold, 1, 3, 14, 1); r(C.goldHi, 7, 2, 2, 1);
+    r(C.goldLo, 2, 4, 1, 4); r(C.goldLo, 13, 4, 1, 4);
+    r(C.gold, 0, 8, 5, 1); r(C.gold, 11, 8, 5, 1); r(C.goldLo, 1, 9, 3, 1); r(C.goldLo, 12, 9, 3, 1);
+    r(C.ironLo, 1, 6, 3, 2); r(C.iron, 1, 6, 1, 1); r('#c0261a', 12, 6, 3, 2); r(C.leaf, 13, 5, 1, 1);
+  } },
+  weights: { w: 16, h: 16, draw(r) {
+    shadowRow(r, 2, 15, 12);
+    r(C.ironDk, 2, 8, 6, 6); r(C.iron, 3, 8, 4, 5); r(C.ironHi, 3, 8, 1, 3); r(C.ironDk, 3, 5, 4, 1); r(C.ironDk, 2, 6, 1, 2); r(C.ironDk, 7, 6, 1, 2);
+    r(C.ironDk, 9, 10, 5, 4); r(C.iron, 10, 10, 3, 3); r(C.ironHi, 10, 10, 1, 2); r(C.ironDk, 10, 8, 3, 1); r(C.ironDk, 9, 9, 1, 1); r(C.ironDk, 13, 9, 1, 1);
+    r(C.gold, 4, 10, 2, 1);
+  } },
+  ram: { w: 32, h: 16, draw(r) {
+    shadowRow(r, 1, 15, 30);
+    r(C.woodDk, 4, 6, 24, 2); r(C.woodDk, 5, 1, 2, 9); r(C.woodDk, 25, 1, 2, 9); r(C.woodLo, 5, 1, 22, 1);
+    r(C.hayLo, 10, 2, 1, 6); r(C.hayLo, 21, 2, 1, 6);
+    r(C.wood, 2, 8, 24, 3); r(C.woodHi, 2, 8, 24, 1); r(C.woodLo, 2, 10, 24, 1);
+    r(C.ironLo, 25, 7, 6, 5); r(C.iron, 26, 8, 4, 3); r(C.ironHi, 26, 8, 1, 1); r(C.ironDk, 30, 9, 1, 1);
+    r(C.ink, 6, 11, 4, 4); r(C.ink, 22, 11, 4, 4); r(C.woodLo, 7, 12, 2, 2); r(C.woodLo, 23, 12, 2, 2);
+  } },
+  dummy: { w: 16, h: 16, draw(r) {
+    shadowRow(r, 4, 15, 8);
+    r(C.woodLo, 7, 10, 2, 5); r(C.woodLo, 2, 6, 12, 1);
+    r(C.hay, 4, 5, 8, 5); r(C.hayLo, 4, 9, 8, 1); r(C.hayHi, 5, 5, 2, 4);
+    r('#c9b98a', 5, 1, 6, 4); r(C.inkTxt, 6, 2, 1, 1); r(C.inkTxt, 9, 2, 1, 1); r('#a8996c', 5, 4, 6, 1);
+    r('#c0261a', 7, 6, 2, 2);
+  } },
+  rope: { w: 48, h: 16, draw(r) {
+    r(C.hayLo, 0, 9, 48, 2); r(C.hay, 0, 9, 48, 1);
+    for (let x = 1; x < 48; x += 3) r(C.hayHi, x, 9, 1, 1);
+    r(C.hayLo, 0, 8, 2, 4); r(C.hayLo, 46, 8, 2, 4);
+    r('#c0261a', 23, 6, 2, 8); r('#e2412f', 23, 6, 1, 3);
+    r(C.gold, 3, 4, 7, 1); r(C.gold, 3, 3, 1, 3); r(C.gold, 2, 4, 1, 1);
+    r(C.gold, 34, 4, 11, 1); r(C.gold, 44, 3, 1, 3); r(C.gold, 45, 4, 1, 1);
+  } },
+  dynamometer: { w: 16, h: 16, draw(r) {
+    shadowRow(r, 3, 15, 10);
+    r(C.stoneDk, 3, 13, 10, 2); r(C.stone, 3, 13, 10, 1);
+    r(C.woodLo, 3, 1, 2, 12); r(C.woodLo, 3, 1, 9, 1);
+    r(C.ironHi, 9, 2, 3, 1); r(C.iron, 8, 3, 5, 6); r('#e6e1d3', 9, 3, 3, 5);
+    r(C.goldLo, 10, 3, 1, 4); r(C.inkTxt, 9, 4, 1, 1); r(C.inkTxt, 9, 6, 1, 1); r('#c0261a', 11, 5, 1, 1);
+    r(C.ironHi, 10, 9, 1, 2); r(C.ironHi, 9, 10, 1, 1); r(C.ironDk, 8, 11, 4, 2);
+  } },
+  apple_tree: { w: 16, h: 24, frames: 2, draw(r, f) {
+    shadowRow(r, 3, 23, 10);
+    r('#7a3f22', 4, 18, 8, 5); r('#9a5530', 4, 18, 8, 1);
+    r(C.woodLo, 7, 11, 2, 7);
+    r(C.leafLo, 2, 2, 12, 10); r(C.leaf, 3, 1, 10, 10); r(C.leaf, 1, 4, 14, 5); r(C.leafHi, 4, 2, 4, 3); r(C.leafHi, 10, 5, 2, 2);
+    r('#c0261a', 4, 6, 2, 2); r('#c0261a', 10, 3, 2, 2); r('#c0261a', 8, 8, 2, 2); r('#ff6b5a', 4, 6, 1, 1);
+    r('#c0261a', 12, 14 + f, 2, 2); r('#ff6b5a', 12, 14 + f, 1, 1);
+  } },
+  sled: { w: 16, h: 16, draw(r) {
+    shadowRow(r, 1, 15, 14);
+    r(C.ironHi, 1, 13, 14, 1); r(C.ironHi, 0, 12, 1, 1); r(C.ironHi, 15, 11, 1, 2);
+    r(C.woodLo, 3, 10, 1, 3); r(C.woodLo, 12, 10, 1, 3);
+    r(C.wood, 2, 9, 12, 2); r(C.woodHi, 2, 9, 12, 1);
+    r(C.woodLo, 3, 6, 10, 3); r(C.woodHi, 3, 6, 10, 1); r('#c9a46b', 3, 7, 1, 1); r('#c9a46b', 12, 7, 1, 1);
+    r(C.woodLo, 5, 4, 6, 2); r('#c9a46b', 5, 5, 1, 1); r(C.hayLo, 13, 8, 3, 1);
+  } },
+  snow: { w: 16, h: 16, draw(r) {
+    r('#aebcc6', 2, 14, 12, 1); r('#c8d4dc', 2, 10, 12, 4); r('#e8eef2', 3, 8, 10, 4); r('#ffffff', 5, 7, 5, 2); r('#ffffff', 4, 9, 2, 1);
+  } },
+  ice_crystal: { w: 16, h: 16, draw(r) {
+    shadowRow(r, 4, 15, 8);
+    r('#5aa8e0', 5, 6, 2, 8); r('#5aa8e0', 9, 5, 2, 9); r('#8fd0ff', 7, 2, 2, 12); r('#bfe6ff', 7, 2, 1, 10); r('#e8f6ff', 8, 3, 1, 2);
+  } },
+  newton: { w: 16, h: 32, draw(r) {
+    shadowRow(r, 1, 31, 14);
+    r(C.stoneDk, 1, 24, 14, 7); r(C.stone, 2, 24, 12, 1); r(C.goldLo, 4, 26, 8, 3); r(C.gold, 5, 27, 6, 1);
+    const S = C.stone, L = C.stoneLt, D = C.stoneDk;
+    r(D, 4, 2, 8, 9); r(S, 5, 1, 6, 2); r(S, 3, 4, 1, 7); r(S, 12, 4, 1, 7); r(D, 3, 6, 1, 1); r(D, 12, 8, 1, 1);
+    r(L, 6, 3, 4, 5); r(D, 7, 5, 1, 1); r(D, 9, 5, 1, 1);
+    r(S, 4, 11, 8, 10); r(L, 5, 11, 2, 9); r(C.white, 7, 11, 2, 2);
+    r(S, 5, 21, 2, 3); r(S, 9, 21, 2, 3);
+    r(D, 2, 13, 2, 5); r('#c0261a', 12, 14, 2, 2); r(C.leaf, 13, 13, 1, 1);
+  } },
+  wagon: { w: 32, h: 20, draw(r) {
+    shadowRow(r, 1, 19, 30);
+    r(C.woodDk, 3, 6, 24, 7); r(C.wood, 4, 7, 22, 5); r(C.woodHi, 4, 7, 22, 1); r(C.woodLo, 10, 7, 1, 5); r(C.woodLo, 18, 7, 1, 5);
+    r(C.gold, 3, 6, 24, 1);
+    r(C.wood, 6, 2, 7, 4); r(C.woodHi, 6, 2, 7, 1); r(C.woodLo, 9, 2, 1, 4); r(C.hay, 15, 3, 8, 3); r(C.hayHi, 15, 3, 8, 1);
+    r(C.woodLo, 27, 10, 5, 1);
+    r(C.ink, 4, 12, 7, 7); r(C.woodLo, 5, 13, 5, 5); r(C.ink, 7, 15, 1, 1); r(C.ink, 19, 12, 7, 7); r(C.woodLo, 20, 13, 5, 5); r(C.ink, 22, 15, 1, 1);
+  } },
   sparkle: { w: 5, h: 5, frames: 3, draw(r, f) {
     const c = [C.goldHi, C.white, C.gold][f];
     r(c, 2, 0, 1, 5); r(c, 0, 2, 5, 1);
@@ -536,6 +660,10 @@ export const SPR = {
 
 // ---------- іконки інвентаря / бонусів (16×16) ----------
 export const ICON = {
+  badge_both: (r) => { r('#c0261a', 4, 0, 3, 5); r('#2f5fa8', 9, 0, 3, 5); r(C.goldLo, 4, 5, 8, 1); r(C.goldLo, 3, 6, 10, 8); r(C.goldLo, 4, 14, 8, 1); r(C.gold, 4, 6, 8, 8); r(C.goldHi, 5, 6, 3, 2); deltaGlyph(r, 5, 8, C.goldDk); },
+  badge_mythic: (r) => { r('#5a1f9c', 5, 1, 6, 1); r('#7c3fd0', 3, 2, 10, 3); r('#a259ff', 4, 2, 8, 2); r('#d6b0ff', 5, 2, 3, 1); r('#7c3fd0', 4, 5, 8, 3); r('#5a1f9c', 5, 8, 6, 3); r('#3a1270', 6, 11, 4, 2); r('#3a1270', 7, 13, 2, 2); r('#d6b0ff', 6, 5, 1, 3); r('#ffffff', 12, 1, 1, 1); r('#ffffff', 2, 9, 1, 1); },
+  chronos: (r) => { const o = '#ff8a1f', d = '#b85a10'; r(o, 4, 2, 8, 1); r(o, 4, 13, 8, 1); r('#ffe0b8', 5, 3, 6, 2); r('#ffe0b8', 6, 5, 4, 2); r('#ffe0b8', 7, 7, 2, 1); r('#ffe0b8', 6, 8, 4, 2); r('#ffe0b8', 5, 10, 6, 3); r(o, 6, 4, 4, 1); r(o, 7, 6, 2, 1); r(o, 5, 11, 6, 2); r(d, 4, 3, 1, 10); r(d, 11, 3, 1, 10); r('#fff1a8', 1, 1, 1, 1); r('#fff1a8', 14, 4, 1, 1); },
+  eternity: (r) => { const o = '#a259ff', d = '#5a1f9c'; r(o, 4, 2, 8, 1); r(o, 4, 13, 8, 1); r('#e8d8ff', 5, 3, 6, 2); r('#e8d8ff', 6, 5, 4, 2); r('#e8d8ff', 7, 7, 2, 1); r('#e8d8ff', 6, 8, 4, 2); r('#e8d8ff', 5, 10, 6, 3); r(o, 6, 4, 4, 1); r(o, 7, 6, 2, 1); r(o, 5, 11, 6, 2); r(d, 4, 3, 1, 10); r(d, 11, 3, 1, 10); r('#ffffff', 1, 2, 1, 1); r('#ffffff', 14, 9, 1, 1); },
   key: (r) => { r(C.goldLo, 3, 5, 5, 5); r(C.gold, 4, 4, 3, 1); r(C.ink, 5, 6, 1, 2); r(C.gold, 4, 5, 3, 4); r(C.ink, 5, 6, 1, 2); r(C.gold, 8, 7, 6, 2); r(C.gold, 12, 9, 1, 2); r(C.gold, 10, 9, 1, 2); r(C.goldHi, 8, 7, 5, 1); },
   shield: (r) => { r(C.goldLo, 3, 2, 10, 8); r(C.goldLo, 4, 10, 8, 2); r(C.goldLo, 6, 12, 4, 2); r(C.red, 4, 3, 8, 7); r(C.red, 5, 10, 6, 2); r(C.red, 7, 12, 2, 1); deltaGlyph(r, 5, 5, C.gold); },
   scroll: (r) => { r(C.parch, 4, 4, 8, 8); r(C.parchLo, 4, 11, 8, 1); r(C.parchDk, 3, 3, 2, 10); r(C.parchDk, 11, 3, 2, 10); r(C.inkTxt, 6, 6, 4, 1); r(C.inkTxt, 6, 8, 3, 1); r('#c0261a', 7, 10, 2, 2); },

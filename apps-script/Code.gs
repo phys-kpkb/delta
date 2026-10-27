@@ -3,16 +3,20 @@
  * Встановлення описано в README.md (розділ «Рейтинг у Google Таблиці»).
  *
  * POST: гра надсилає результат, а він дописується рядком у лист «Результати».
- * GET ?action=top&level=1: найкращий час кожного гравця та кількість спроб.
+ * GET ?action=top&level=1: найкращий час кожного гравця, кількість спроб і бейджі.
+ *
+ * Бейджі рахуються з усіх рядків гравця:
+ *   both   — є результати і рівня 1, і рівня 2;
+ *   mythic — хоч раз відчинено міфічні двері (колонка «Міфічні»).
  */
 
 const SHEET_NAME = 'Результати';
 const HEAD = [
   'Записано', 'Рівень', 'Нік', 'Група', 'Студент',
   'Час, с', 'Час', 'Помилки', 'Штраф, с', 'Бонус, с', 'Чистий час, с',
-  'Герой', 'ID групи', 'ID студента', 'Пристрій', 'ID забігу',
+  'Герой', 'ID групи', 'ID студента', 'Пристрій', 'ID забігу', 'Міфічні',
 ];
-const COL = { level: 2, nick: 3, group: 4, student: 5, sec: 6, groupId: 13, studentId: 14, device: 15, runId: 16 };
+const COL = { level: 2, nick: 3, group: 4, student: 5, sec: 6, groupId: 13, studentId: 14, device: 15, runId: 16, mythic: 17 };
 
 function sheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -22,6 +26,10 @@ function sheet_() {
     sh.appendRow(HEAD);
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, HEAD.length).setFontWeight('bold');
+  }
+  // таблиця зі старої версії: дописати нові заголовки
+  if (sh.getLastColumn() < HEAD.length) {
+    sh.getRange(1, 1, 1, HEAD.length).setValues([HEAD]).setFontWeight('bold');
   }
   return sh;
 }
@@ -50,7 +58,9 @@ function doPost(e) {
     const ms = Number(d.timeMs);
     const nick = cut_(d.nick, 24);
     if (!(level >= 1 && level <= 50)) throw new Error('bad level');
-    if (!(ms >= 20000 && ms <= 6 * 3600 * 1000)) throw new Error('bad time');
+    if (!(ms >= 0 && ms <= 6 * 3600 * 1000)) throw new Error('bad time');
+    // бонуси можуть сильно зменшити час, тож на «надто швидко» перевіряємо чистий час
+    if (Number(d.rawMs) && Number(d.rawMs) < 30000) throw new Error('too fast');
     if (nick.length < 2) throw new Error('bad nick');
     const runId = cut_(d.runId, 40);
 
@@ -68,6 +78,7 @@ function doPost(e) {
         Math.round(ms) / 1000, fmt_(ms), Number(d.mistakes) || 0, Number(d.penalty) || 0, Number(d.bonus) || 0,
         Math.round(Number(d.rawMs) || 0) / 1000,
         cut_(d.hero, 20), cut_(d.groupId, 40), cut_(d.studentId, 40), cut_(d.device, 40), runId,
+        d.mythic ? 1 : '',
       ]);
     } finally {
       lock.releaseLock();
@@ -85,19 +96,34 @@ function doGet(e) {
   const last = sh.getLastRow();
   if (last < 2) return out_({ ok: true, level: level, rows: [] });
   const vals = sh.getRange(2, 1, last - 1, HEAD.length).getValues();
+  const keyOf = function (r) {
+    const studentId = String(r[COL.studentId - 1] || '');
+    return studentId ? 's:' + studentId : 'n:' + String(r[COL.nick - 1]).toLowerCase() + ':' + String(r[COL.device - 1] || '');
+  };
+  // бейджі по всіх рівнях
+  const levelsOf = {}, mythicOf = {};
+  for (let i = 0; i < vals.length; i++) {
+    const k = keyOf(vals[i]);
+    (levelsOf[k] = levelsOf[k] || {})[Number(vals[i][COL.level - 1])] = true;
+    if (vals[i][COL.mythic - 1]) mythicOf[k] = true;
+  }
+  const badgesOf = function (k) {
+    const b = [];
+    if (levelsOf[k] && levelsOf[k][1] && levelsOf[k][2]) b.push('both');
+    if (mythicOf[k]) b.push('mythic');
+    return b;
+  };
   const byKey = {};
   for (let i = 0; i < vals.length; i++) {
     const r = vals[i];
     if (Number(r[COL.level - 1]) !== level) continue;
     const nick = String(r[COL.nick - 1]);
-    const studentId = String(r[COL.studentId - 1] || '');
-    const device = String(r[COL.device - 1] || '');
-    const key = studentId ? 's:' + studentId : 'n:' + nick.toLowerCase() + ':' + device;
+    const key = keyOf(r);
     const ms = Math.round(Number(r[COL.sec - 1]) * 1000);
     const row = {
       key: key, nick: nick,
       group: String(r[COL.group - 1] || ''), groupId: String(r[COL.groupId - 1] || ''),
-      student: String(r[COL.student - 1] || ''), best: ms, attempts: 1,
+      student: String(r[COL.student - 1] || ''), best: ms, attempts: 1, badges: badgesOf(key),
     };
     const cur = byKey[key];
     if (!cur) byKey[key] = row;

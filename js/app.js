@@ -1,5 +1,5 @@
 import { loadGroups, submitResult, fetchRating, ratingEnabled } from './net.js';
-import { LEVELS, DOOR_TYPES, BONUSES, graphSVG, boardGraphSVG } from './levels.js';
+import { LEVELS, DOOR_TYPES, BONUSES, TIERS, BADGES, graphSVG, boardGraphSVG } from './levels.js';
 import { CLASSES, heroSprite, heroURL, iconURL, spriteURL } from './art.js';
 import { initAudio, setMusic, setSfx, setMood, sfx } from './audio.js';
 import { Game } from './game.js';
@@ -43,7 +43,9 @@ const S = {
   device: LS.get('device'),
   groups: null,
   groupsState: 'loading',
-  run: LS.get('run'),
+  runs: LS.get('runs', {}),
+  run: null,
+  badges: LS.get('badges', []),
   results: LS.get('results', []),
   pending: LS.get('pending', []),
   tab: 'levels',
@@ -54,7 +56,36 @@ const S = {
 };
 if (!S.device) { S.device = uid(); LS.set('device', S.device); }
 
-const saveRun = () => LS.set('run', S.run);
+// старий формат: один забіг під ключем 'run'
+{ const old = LS.get('run'); if (old && !old.finished && !S.runs[old.level]) S.runs[old.level] = old; LS.set('run', null); LS.set('runs', S.runs); }
+
+function saveRun() {
+  if (S.run) S.runs[S.run.level] = S.run;
+  LS.set('runs', S.runs);
+}
+function dropRun(level) {
+  delete S.runs[level];
+  if (S.run && S.run.level === level) S.run = null;
+  LS.set('runs', S.runs);
+}
+const activeRun = (level) => { const r = S.runs[level]; return r && !r.finished ? r : null; };
+
+// ---------- бейджі ----------
+function localBadges() {
+  const set = new Set(S.badges);
+  const lv = new Set(S.results.map((r) => r.level));
+  if (lv.has(1) && lv.has(2)) set.add('both');
+  if (S.results.some((r) => r.mythic)) set.add('mythic');
+  return [...set].filter((b) => BADGES[b]);
+}
+function earnBadge(id) {
+  if (S.badges.includes(id)) return false;
+  S.badges.push(id); LS.set('badges', S.badges);
+  return true;
+}
+function badgeIcons(list, size = 2) {
+  return (list || []).filter((b) => BADGES[b]).map((b) => `<img class="badge-ic" src="${iconURL(BADGES[b].icon, size)}" alt="${BADGES[b].name}" title="${BADGES[b].name}: ${BADGES[b].text}">`).join('');
+}
 
 let game = null;
 let hudTimer = null;
@@ -282,7 +313,7 @@ function renderLevels() {
   const box = $('#tab-levels');
   if (!S.profile || !S.hero) { box.innerHTML = ''; return; }
   const c = CLASSES[S.hero.cls];
-  const run = S.run && !S.run.finished ? S.run : null;
+  const myBadges = localBadges();
   box.innerHTML = `
     <div class="card who">
       <div class="who-ava"><img src="${heroURL(S.hero.cls, S.hero.gender, 3)}" alt=""></div>
@@ -291,6 +322,14 @@ function renderLevels() {
         <div class="who-meta">${esc(profileMeta())}</div>
       </div>
       <button class="linkbtn" id="lv-prof">Змінити</button>
+    </div>
+
+    <div class="h2">Бейджі</div>
+    <div class="badges">${Object.entries(BADGES).map(([id, b]) => `
+      <div class="badge ${myBadges.includes(id) ? 'on' : ''}">
+        <img src="${iconURL(b.icon, 3)}" alt="">
+        <div><div class="badge-n">${b.name}</div><div class="badge-t">${myBadges.includes(id) ? b.text : 'Ще не отримано: ' + b.text.toLowerCase()}</div></div>
+      </div>`).join('')}
     </div>
 
     <div class="h2">Твій герой</div>
@@ -308,7 +347,8 @@ function renderLevels() {
     ${LEVELS.map((L) => {
       if (L.locked) return `<div class="level locked"><div class="level-deco">0${L.id}</div><div class="level-n">Рівень ${ROMAN[L.id]}</div><div class="level-t">${L.title}</div><div class="level-s">${L.subtitle}</div></div>`;
       const best = bestLocal(L.id);
-      const mine = run && run.level === L.id;
+      const run = activeRun(L.id);
+      const mine = !!run;
       return `<button class="level" data-level="${L.id}">
         <div class="level-deco">0${L.id}</div>
         <div class="level-n">Рівень ${ROMAN[L.id]}</div>
@@ -330,7 +370,7 @@ function renderLevels() {
   `;
   $('#lv-prof').onclick = () => openProfile(false);
   $('#lv-hero').onclick = () => {
-    if (S.run && !S.run.finished) toast('Новий герой буде в наступному забігу. Поточний забіг доходить старий.', 2800);
+    if (Object.values(S.runs).some((r) => r && !r.finished)) toast('Новий герой буде в наступному забігу. Поточний забіг доходить старий.', 2800);
     openHeroPicker(false);
   };
   $$('.level[data-level]', box).forEach((b) => b.onclick = () => startLevel(+b.dataset.level));
@@ -341,8 +381,9 @@ const HOWTO = `<ol style="margin:0;padding-left:20px">
   <li>Торкнись клітинки, і герой піде туди. Торкнись предмета, і він підійде та роздивиться його.</li>
   <li>Предмети, що <b>поблискують</b>, це підказки: формули, означення і числа для задач.</li>
   <li>Двері просять відповідь. У кожних дверей свої правила, вони написані зверху.</li>
-  <li>За кожні відчинені двері обираєш бонус: ключ, щит, сувій, годинник або чоботи.</li>
-  <li>Таймер іде від входу в перший зал до печаті Паладина і <b>не зупиняється</b>. Помилки додають секунди.</li>
+  <li>За кожні відчинені двері обираєш бонус. Бонуси бувають <b style="color:var(--rare)">рідкісні</b>, <b style="color:var(--legendary)">легендарні</b> і <b style="color:var(--mythic)">міфічні</b>.</li>
+  <li>У другому рівні є <b style="color:var(--mythic)">міфічні фіолетові двері</b>: складна задача, одна спроба. Нагорода: ключ, міфічний бонус і бейдж.</li>
+  <li>Таймер іде від входу в перший зал до фінальної печаті і <b>не зупиняється</b>. Помилки додають секунди.</li>
   <li>У кожного гравця свої числа в задачах, тож відповідь сусіда тобі не підійде.</li>
 </ol>`;
 
@@ -354,7 +395,7 @@ function confirmRestart(level) {
     <div class="s-actions btn-row"><button class="btn dark" id="cr-no">Ні</button><button class="btn" id="cr-yes">Так, заново</button></div>
   `);
   $('#cr-no', sh).onclick = closeSheet;
-  $('#cr-yes', sh).onclick = () => { S.run = null; saveRun(); closeSheet(); if (!$('#scr-game').hidden) exitGame(); startLevel(level); };
+  $('#cr-yes', sh).onclick = () => { dropRun(level); closeSheet(); if (!$('#scr-game').hidden) exitGame(); startLevel(level); };
 }
 
 // ---------- забіг ----------
@@ -370,8 +411,8 @@ function newRun(levelId) {
     startedAt: Date.now(), roomStart: Date.now(),
     room: 0, penalty: 0, bonusTime: 0, mistakes: 0,
     inv: { key: S.hero.cls === 'carpenter' ? 1 : 0, shield: 0, scroll: 0, boots: false },
-    rs: L.rooms.map(() => ({ read: [], open: false, qi: 0, fails: 0, failsQ: {}, restored: false, broken: false, scrolls: {} })),
-    splits: [], catTaps: 0, catGift: false, finished: false,
+    rs: L.rooms.map(() => ({ read: [], open: false, qi: 0, fails: 0, failsQ: {}, restored: false, broken: false, scrolls: {}, mythic: null })),
+    splits: [], catTaps: 0, catGift: false, finished: false, mythic: false,
   };
 }
 
@@ -383,7 +424,8 @@ const score = () => Math.max(0, elapsed() + S.run.penalty - S.run.bonusTime);
 
 function startLevel(levelId) {
   initAudio();
-  if (!S.run || S.run.finished || S.run.level !== levelId) {
+  S.run = activeRun(levelId);
+  if (!S.run) {
     S.run = newRun(levelId);
     saveRun();
   } else if (Date.now() - S.run.startedAt > 6 * 3600 * 1000) {
@@ -423,6 +465,7 @@ function buildObjects(room, i) {
   const objs = room.objects(p).map((o) => {
     const x = { ...o };
     if (x.kind === 'door') { x.sprite = DOOR_TYPES[x.door].sprite; x.open = rs.open; }
+    if (x.kind === 'mythic') { x.state = rs.mythic; x.title = 'Міфічні двері'; }
     if (x.kind === 'hint') x.read = rs.read.includes(x.id);
     if (x.kind === 'fresco') { x.restored = rs.restored; x.glint = cls === 'painter'; x.title = 'Вицвіла фреска'; }
     if (x.kind === 'crack') { x.broken = rs.broken; x.glint = cls === 'welder'; x.title = 'Тріснута кладка'; }
@@ -526,6 +569,7 @@ function onInteract(o) {
     openDoor(o);
     return;
   }
+  if (o.kind === 'mythic') { openMythic(o); return; }
   if (o.kind === 'hint') {
     sfx('read');
     if (!rs.read.includes(o.id)) { rs.read.push(o.id); saveRun(); }
@@ -635,6 +679,16 @@ function signalHTML(x, ans) {
   return `<span class="signal">${[1, 2, 3, 4].map((i) => `<i class="${i <= lvl ? 'on' : ''}" style="height:${4 + i * 3}px"></i>`).join('')}</span>Сигнал: ${word}`;
 }
 
+// панель «Дано»: умова задачі й уже знайдені величини, щоб не тримати їх у голові
+function givenHTML(o, qs, qi) {
+  const items = (o.given || []).map((g) => `<span class="given-it">${g}</span>`);
+  qs.slice(0, qi).forEach((q) => {
+    if (q.found && q.kind === 'num') items.push(`<span class="given-it found">${q.found} = ${String(q.answer).replace('.', ',')} ${q.unit}</span>`);
+  });
+  if (!items.length) return '';
+  return `<div class="given"><div class="given-k">Дано${qi > 0 && qs.some((q, i) => i < qi && q.found) ? ' і знайдено' : ''}</div><div class="given-list">${items.join('')}</div></div>`;
+}
+
 function openDoor(o, feedback = null) {
   const rs = curRS();
   const type = DOOR_TYPES[o.door];
@@ -664,8 +718,9 @@ function openDoor(o, feedback = null) {
   const sh = openSheet(`
     <div class="s-head"><div class="s-icon"><img src="${spriteURL(type.sprite, o.w > 1 ? 1 : 3)}" alt=""></div>
       <div><div class="s-kicker">Двері · зал ${S.run.room + 1}</div><div class="s-title">${type.name}</div></div></div>
-    <div class="rules">${type.rules.map((r) => `<div class="rule">${welder && /\+\d+ с/.test(r) ? r.replace(/\+(\d+) с/g, (m, d) => `+${d / 2} с (муляр)`) : r}</div>`).join('')}</div>
+    <div class="rules">${type.rules.map((r) => `<div class="rule"><span>${welder && /\+\d+ с/.test(r) ? r.replace(/\+(\d+) с/g, (m, d) => `+${d / 2} с (муляр)`) : r}</span></div>`).join('')}</div>
     ${qs.length > 1 ? `<div class="q-step">${qs.map((_, i) => `<i class="${i < qi ? 'done' : i === qi ? 'cur' : ''}"></i>`).join('')}</div>` : ''}
+    ${givenHTML(o, qs, qi)}
     <div class="q-text">${q.text}</div>
     ${answerUI}
     <div class="feedback ${feedback ? feedback.cls : ''}" id="fb">${feedback ? feedback.html : ''}</div>
@@ -751,32 +806,133 @@ function openDoorDone(o, note) {
   setTimeout(() => openBonus('Двері відчинено!', 'Обери нагороду', () => game.walkIntoDoor()), 450);
 }
 
-function openBonus(title, kicker, then) {
+function drawBonuses(level, count = 3) {
   const inv = S.run.inv;
-  const pool = Object.keys(BONUSES).filter((k) => !(k === 'boots' && inv.boots));
-  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-  const pick3 = pool.slice(0, 3);
-  sfx('bonus');
+  const cfg = level.bonus || { rare: Object.keys(BONUSES), legendary: [], legendaryChance: 0 };
+  const w = (k) => (cfg.weights && cfg.weights[k] != null ? cfg.weights[k] : 1);
+  const usable = (k) => !(k === 'boots' && inv.boots);
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const tier = Math.random() < cfg.legendaryChance ? 'legendary' : 'rare';
+    let pool = (cfg[tier] || []).filter((k) => usable(k) && !out.some((o) => o.k === k));
+    let t = tier;
+    if (!pool.length) { t = tier === 'rare' ? 'legendary' : 'rare'; pool = (cfg[t] || []).filter((k) => usable(k) && !out.some((o) => o.k === k)); }
+    if (!pool.length) break;
+    const total = pool.reduce((s2, k) => s2 + w(k), 0);
+    let r = Math.random() * total, k = pool[0];
+    for (const c of pool) { r -= w(c); if (r <= 0) { k = c; break; } }
+    out.push({ k, tier: t });
+  }
+  return out;
+}
+
+function applyBonus(k) {
+  const inv = S.run.inv;
+  if (k === 'key') inv.key++;
+  else if (k === 'shield') inv.shield++;
+  else if (k === 'scroll') inv.scroll++;
+  else if (k === 'boots') { inv.boots = true; game.setSpeed(2); }
+  else if (BONUSES[k].time) { S.run.bonusTime += BONUSES[k].time; renderTimer(); }
+}
+
+function bonusCard(k, tier, attrs = '') {
+  const B = BONUSES[k], T = TIERS[tier];
+  return `<button class="bonus tier-${T.cls}" data-k="${k}" ${attrs}><img src="${iconURL(B.icon, 3)}" alt="">
+    <div><div class="tier-chip">${T.name}</div><div class="bonus-n">${B.name}</div><div class="bonus-t">${B.text}</div></div></button>`;
+}
+
+function openBonus(title, kicker, then) {
+  const picks = drawBonuses(curLevel());
+  sfx(picks.some((p) => p.tier === 'legendary') ? 'mythic' : 'bonus');
   const sh = openSheet(`
     <div class="s-head"><div class="s-icon"><img src="${iconURL('chest', 3)}" alt=""></div><div><div class="s-kicker">${kicker}</div><div class="s-title">${title}</div></div></div>
     <p class="note">Можна взяти лише одне.</p>
-    <div class="bonuses">${pick3.map((k) => `
-      <button class="bonus" data-k="${k}"><img src="${iconURL(BONUSES[k].icon, 3)}" alt="">
-        <div><div class="bonus-n">${BONUSES[k].name}</div><div class="bonus-t">${BONUSES[k].text}</div></div></button>`).join('')}
-    </div>`, { dismiss: false });
+    <div class="bonuses">${picks.map((p) => bonusCard(p.k, p.tier)).join('')}</div>`, { dismiss: false });
   $$('.bonus', sh).forEach((b) => b.onclick = () => {
     const k = b.dataset.k;
-    if (k === 'key') inv.key++;
-    else if (k === 'shield') inv.shield++;
-    else if (k === 'scroll') inv.scroll++;
-    else if (k === 'boots') { inv.boots = true; game.setSpeed(2); }
-    else if (k === 'hourglass') { S.run.bonusTime += 20; renderTimer(); }
+    applyBonus(k);
     saveRun(); sfx('key');
     renderInv(k);
     closeSheet();
-    toast(k === 'hourglass' ? '−20 с від часу!' : `Отримано: ${BONUSES[k].name}`, 1600);
+    toast(BONUSES[k].time ? `−${BONUSES[k].time} с від часу!` : `Отримано: ${BONUSES[k].name}`, 1600);
     if (then) setTimeout(then, 250);
   });
+}
+
+// ---------- міфічні двері ----------
+function openMythic(o, stage = 'warn') {
+  const rs = curRS();
+  const type = DOOR_TYPES.mythic;
+  const head = (kicker, title) => `<div class="s-head"><div class="s-icon mythic-ic"><img src="${spriteURL(game.spriteName(o), 3)}" alt=""></div>
+    <div><div class="s-kicker mythic-k">${kicker}</div><div class="s-title">${title}</div></div></div>`;
+  if (rs.mythic === 'won') {
+    const sh = openSheet(`${head('Міфічні двері', 'Скарб уже твій')}<div class="s-body">За дверима порожня ніша і фіолетовий пил. Бейдж «Міфічний» уже у твоїй колекції.</div><div class="s-actions"><button class="btn dark" id="ok">Іти далі</button></div>`, { cls: 'compact mythic-sheet' });
+    $('#ok', sh).onclick = closeSheet; return;
+  }
+  if (rs.mythic === 'lost') {
+    const sh = openSheet(`${head('Міфічні двері', 'Від дверей лишився пил')}<div class="s-body">Друга спроба не передбачена. Але в наступному забігу двері з'являться знову, з новими числами.</div><div class="s-actions"><button class="btn dark" id="ok">Іти далі</button></div>`, { cls: 'compact mythic-sheet' });
+    $('#ok', sh).onclick = closeSheet; return;
+  }
+  if (stage === 'warn') {
+    sfx('mythic');
+    const sh = openSheet(`
+      ${head('Необов’язкове випробування', type.name)}
+      <div class="mythic-warn">Увага: <b>лише одна спроба</b>. Помилишся, і двері розсиплються до кінця забігу.</div>
+      <div class="rules">${type.rules.map((r) => `<div class="rule"><span>${r}</span></div>`).join('')}</div>
+      <div class="s-actions stack">
+        <button class="btn mythic-btn" id="m-go">Ризикнути</button>
+        <button class="btn dark" id="m-no">Не зараз, спершу пошукаю підказки</button>
+      </div>`, { cls: 'mythic-sheet' });
+    $('#m-go', sh).onclick = () => openMythic(o, 'ask');
+    $('#m-no', sh).onclick = closeSheet;
+    return;
+  }
+  const q = o.questions[0];
+  const sh = openSheet(`
+    ${head('Одна спроба', type.name)}
+    ${givenHTML(o, o.questions, 0)}
+    <div class="q-text">${q.text}</div>
+    <form class="answer" id="ans-form" autocomplete="off">
+      <input class="input" id="ans" inputmode="decimal" enterkeyhint="done" placeholder="?" aria-label="Відповідь">
+      <span class="unit">${q.unit}</span>
+      <button class="btn mythic-btn" type="submit">OK</button>
+    </form>
+    <div class="feedback" id="fb"></div>
+    <div class="s-actions"><button class="btn dark" id="m-no">Відійти (спробу не витрачено)</button></div>`, { cls: 'mythic-sheet', dismiss: true });
+  const input = $('#ans', sh);
+  setTimeout(() => input.focus({ preventScroll: true }), 280);
+  $('#m-no', sh).onclick = closeSheet;
+  $('#ans-form', sh).onsubmit = (e) => {
+    e.preventDefault();
+    const x = parseNum(input.value);
+    if (Number.isNaN(x)) { const fb = $('#fb', sh); fb.className = 'feedback info'; fb.textContent = 'Введи число (можна з комою). Спробу не витрачено.'; return; }
+    if (numOk(x, q.answer)) {
+      rs.mythic = 'won'; o.state = 'won'; S.run.mythic = true;
+      applyBonus('key'); applyBonus('eternity');
+      const fresh = earnBadge('mythic');
+      saveRun(); renderInv('key'); sfx('mythic'); sfx('door');
+      const sh2 = openSheet(`
+        <div class="mythic-win">
+          <img class="mythic-badge" src="${iconURL('badge_mythic', 7)}" alt="">
+          <div class="s-kicker mythic-k">Міфічні двері підкорено</div>
+          <div class="s-title">Бейдж «${BADGES.mythic.name}»${fresh ? '' : ' (уже був)'}</div>
+          <p class="note">Його бачитимуть у рейтингу поруч із твоїм ніком.</p>
+          <div class="bonuses">${bonusCard('key', 'legendary', 'disabled')}${bonusCard('eternity', 'mythic', 'disabled')}</div>
+          <div class="s-actions"><button class="btn mythic-btn" id="ok">Забрати все</button></div>
+        </div>`, { cls: 'mythic-sheet', dismiss: false });
+      confetti(['#a259ff', '#d6b0ff', '#7c3fd0', '#fff']);
+      $('#ok', sh2).onclick = closeSheet;
+    } else {
+      rs.mythic = 'lost'; o.state = 'lost';
+      saveRun(); sfx('crumble');
+      const sh2 = openSheet(`
+        ${head('Двері розсипалися', 'Цього разу ні')}
+        <div class="s-body">Правильна відповідь: <b>${String(q.answer).replace('.', ',')} ${q.unit}</b>.<br>Розв’язок: ${q.hint || ''}</div>
+        <p class="note">Штрафу немає. Міфічні двері чекатимуть у наступному забігу з новими числами.</p>
+        <div class="s-actions"><button class="btn dark" id="ok">Іти далі</button></div>`, { cls: 'mythic-sheet' });
+      $('#ok', sh2).onclick = closeSheet;
+    }
+  };
 }
 
 function onExit() {
@@ -808,18 +964,23 @@ async function victory() {
     nick: p.nick || 'Анонім', groupId: p.groupId || '', group: p.groupName || '',
     studentId: p.studentId || '', student: p.studentName || '',
     hero: run.hero.cls, gender: run.hero.gender, runId: run.id, device: S.device, at: Date.now(),
+    mythic: !!run.mythic,
   };
   const prevBest = bestLocal(run.level);
+  const hadBoth = localBadges().includes('both');
   S.results.push(entry); LS.set('results', S.results);
-  S.run = null; saveRun();
+  dropRun(run.level);
   delete S.rtCache[entry.level];
+  const newBadges = [];
+  if (!hadBoth && localBadges().includes('both')) { earnBadge('both'); newBadges.push('both'); }
+  if (run.mythic) newBadges.push('mythic');
 
   const sh = openSheet(`
     <div class="win">
       <img class="win-crown" src="${iconURL('crown', 6)}" alt="">
       <div class="win-k">Рівень ${ROMAN[L.id]} · ${L.title}</div>
-      <div class="win-t">Печать зламано!</div>
-      <div class="note">Орден Дельти визнає тебе паладином руху.</div>
+      <div class="win-t">${(L.win || {}).title || 'Печать зламано!'}</div>
+      <div class="note">${(L.win || {}).text || ''}</div>
       <div class="win-time">${fmtTime(total)}</div>
       ${prevBest != null ? `<div class="chip ${total < prevBest ? 'gold' : ''}">${total < prevBest ? 'Новий особистий рекорд!' : 'Твій рекорд: ' + fmtTime(prevBest)}</div>` : ''}
       <div class="win-grid">
@@ -828,6 +989,7 @@ async function victory() {
         <div class="win-cell"><span>Штрафи</span><strong style="color:var(--minus)">+${run.penalty} с</strong></div>
         <div class="win-cell"><span>Бонус часу</span><strong style="color:var(--plus)">−${run.bonusTime} с</strong></div>
       </div>
+      ${newBadges.length ? `<div class="win-badges">${newBadges.map((b) => `<div class="badge on"><img src="${iconURL(BADGES[b].icon, 3)}" alt=""><div><div class="badge-n">${BADGES[b].name}</div><div class="badge-t">${BADGES[b].text}</div></div></div>`).join('')}</div>` : ''}
       <div class="splits">${L.rooms.map((r, i) => `<div class="split"><span>${i + 1}. ${r.name}</span><span>${run.splits[i] != null ? fmtTime(run.splits[i]) : '—'}</span></div>`).join('')}</div>
       <div class="sent" id="w-sent">${ratingEnabled() ? 'Надсилаю результат у рейтинг…' : 'Результат збережено на цьому пристрої.'}</div>
       <div class="stack">
@@ -849,14 +1011,14 @@ async function victory() {
   }
 }
 
-function confetti() {
+function confetti(cols0) {
   const c = document.createElement('canvas');
   c.className = 'confetti';
   document.body.appendChild(c);
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   c.width = innerWidth * dpr; c.height = innerHeight * dpr;
   const g = c.getContext('2d');
-  const cols = ['#f6de8f', '#d8b04a', '#8c6b22', '#fff'];
+  const cols = cols0 || ['#f6de8f', '#d8b04a', '#8c6b22', '#fff'];
   const ps = Array.from({ length: 140 }, () => ({
     x: c.width / 2 + (Math.random() - 0.5) * c.width * 0.3, y: c.height * 0.35,
     vx: (Math.random() - 0.5) * 16 * dpr, vy: (-Math.random() * 16 - 6) * dpr,
@@ -906,7 +1068,7 @@ async function renderRating(refetch) {
     const mine = S.results.filter((r) => r.level === lv);
     if (mine.length) {
       const best = mine.reduce((a, b) => (a.timeMs <= b.timeMs ? a : b));
-      rows = [{ ...best, best: best.timeMs, attempts: mine.length, key: myKey() }];
+      rows = [{ ...best, best: best.timeMs, attempts: mine.length, key: myKey(), badges: localBadges() }];
     } else rows = [];
     note = `<div class="card note" style="margin-bottom:12px">Загальний рейтинг ще не підключено, тому тут видно лише результати з цього пристрою. Викладач підключає таблицю за інструкцією з README.</div>`;
   }
@@ -931,7 +1093,7 @@ async function renderRating(refetch) {
         const meta = [r.group ? 'гр. ' + r.group : '', r.student].filter(Boolean).join(' · ') || 'без групи';
         return `<div class="row ${r.key === me ? 'me' : ''}">
           <div class="rank ${rank <= 3 ? 'r' + rank : ''}">${rank <= 3 ? `<span class="medal">${rank}</span>` : rank}</div>
-          <div style="min-width:0"><div class="row-nick">${esc(r.nick)}</div><div class="row-meta">${esc(meta)}</div></div>
+          <div style="min-width:0"><div class="row-nick">${esc(r.nick)}<span class="row-badges">${badgeIcons(r.key === me ? [...new Set([...(r.badges || []), ...localBadges()])] : r.badges)}</span></div><div class="row-meta">${esc(meta)}</div></div>
           <div class="row-time"><div class="row-t">${fmtTime(r.best / 1000)}</div><div class="row-a">${r.attempts} ${plural(r.attempts, 'спроба', 'спроби', 'спроб')}</div></div>
         </div>`;
       }).join('')

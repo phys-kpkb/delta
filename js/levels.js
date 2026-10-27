@@ -1,3 +1,4 @@
+import { LEVEL2 } from './level2.js';
 // Рівні й кімнати. Числа в задачах генеруються з «зерна» забігу,
 // тож у кожного гравця свої значення, а підказки в кімнаті з ними збігаються.
 
@@ -21,6 +22,14 @@ export const DOOR_TYPES = {
   seal: {
     name: 'Печать Паладина', sprite: 'seal', penalty: 30, key: false,
     rules: ['Фінал: 3 випробування поспіль', 'Кожна помилка: +30 с', 'Ні ключі, ні хитрощі тут не працюють'],
+  },
+  newton: {
+    name: 'Печать Ньютона', sprite: 'seal', penalty: 30, key: false,
+    rules: ['Фінал: 3 випробування поспіль', 'Кожна помилка: +30 с', 'Ні ключі, ні хитрощі тут не працюють'],
+  },
+  mythic: {
+    name: 'Міфічні двері', sprite: 'door_mythic', mythic: true, penalty: 0, key: false,
+    rules: ['Лише <b>одна спроба</b>: помилишся, і двері розсиплються', 'Штрафу часу немає', 'Ключ і сувій мудреця тут не діють', 'Нагорода: ключ, міфічний бонус і бейдж «Міфічний»'],
   },
 };
 
@@ -333,11 +342,12 @@ const room5 = {
     const c = CONCEPT[p.ci];
     return [
       { id: 'door', kind: 'door', x: 3, y: 1, w: 3, wall: true, door: 'seal',
+        given: [`v₀ = 0`, `a = ${n(p.a)} м/с²`, `t = ${p.t} с`],
         questions: [
-          { kind: 'num', unit: 'м/с', answer: p.v,
+          { kind: 'num', unit: 'м/с', answer: p.v, found: 'v',
             text: `Колісниця рушає з місця з прискоренням <b>${p.a} м/с²</b>. Яку швидкість вона матиме через <b>${p.t} с</b>?`,
             hint: `${F('v = v₀ + a·t')} = 0 + ${p.a} · ${p.t}` },
-          { kind: 'num', unit: 'м', answer: p.s,
+          { kind: 'num', unit: 'м', answer: p.s, found: 's',
             text: `Який шлях пройде ця колісниця за ці <b>${p.t} с</b>?`,
             hint: `${F('s = a·t² / 2')} = ${p.a} · ${p.t}² / 2` },
           { kind: 'choice', text: c.text, options: p.order.map((i) => c.options[i]), correct: p.order.indexOf(c.correct),
@@ -373,17 +383,32 @@ export const LEVELS = [
     subtitle: 'Рух · Швидкість · Прискорення',
     desc: 'П\'ять залів замку Ордену Дельти: від швидкості гінця до печаті Паладина.',
     rooms: [room1, room2, room3, room4, room5],
+    bonus: { rare: ['key', 'shield', 'scroll', 'hourglass'], legendary: ['boots'], legendaryChance: 0.25 },
+    win: { title: 'Печать зламано!', text: 'Орден Дельти визнає тебе паладином руху.' },
   },
-  { id: 2, title: 'Динаміка', subtitle: 'Сила · Маса · Закони Ньютона', locked: true },
+  LEVEL2,
   { id: 3, title: 'Енергія', subtitle: 'Робота · Потужність · Енергія', locked: true },
 ];
 
 export const BONUSES = {
-  key: { name: 'Ключ', icon: 'key', text: 'Відчиняє дубові двері або двері терпіння без відповіді.' },
+  key: { name: 'Ключ', icon: 'key', text: 'Відчиняє двері кімнати без відповіді (дубові, двері терпіння).' },
   shield: { name: 'Щит паладина', icon: 'shield', text: 'Наступна помилка не додасть штрафу.' },
   scroll: { name: 'Сувій мудреця', icon: 'scroll', text: 'На будь-яких дверях покаже, як рахувати відповідь (з твоїми числами).' },
-  hourglass: { name: 'Пісочний годинник', icon: 'hourglass', text: 'Одразу −20 с від твого часу.' },
+  hourglass: { name: 'Пісочний годинник', icon: 'hourglass', text: 'Одразу −20 с від твого часу.', time: 20 },
   boots: { name: 'Чоботи-скороходи', icon: 'boots', text: 'Ходиш удвічі швидше до кінця рівня.' },
+  chronos: { name: 'Годинник Хроноса', icon: 'chronos', text: 'Одразу −45 с від твого часу.', time: 45 },
+  eternity: { name: 'Пісок вічності', icon: 'eternity', text: 'Одразу −60 с від твого часу.', time: 60 },
+};
+
+export const TIERS = {
+  rare: { name: 'Рідкісний', cls: 'rare' },
+  legendary: { name: 'Легендарний', cls: 'legendary' },
+  mythic: { name: 'Міфічний', cls: 'mythic' },
+};
+
+export const BADGES = {
+  both: { name: 'Магістр Ордену', text: 'Пройдено обидва рівні', icon: 'badge_both' },
+  mythic: { name: 'Міфічний', text: 'Відчинено міфічні двері', icon: 'badge_mythic' },
 };
 
 export function graphSVG(type, opts = {}) {
